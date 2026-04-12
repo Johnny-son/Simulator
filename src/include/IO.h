@@ -85,17 +85,23 @@ struct DisIssIO {
 	DisIssIO() { std::memset(this, 0, sizeof(DisIssIO)); }
 };
 
+struct DisRobIO {
+	ExecUop req[RENAME_WIDTH];
+	wire<1> valid[RENAME_WIDTH];
+
+	DisRobIO() { std::memset(this, 0, sizeof(DisRobIO)); }
+};
+
 struct IssDisIO {
 	wire<8> ready_num;
 
 	IssDisIO() { std::memset(this, 0, sizeof(IssDisIO)); }
 };
 
-struct IssRobIO {
-	ExecUop wb[ISSUE_WIDTH];
-	wire<1> valid[ISSUE_WIDTH];
+struct RobDisIO {
+	wire<8> ready_num;
 
-	IssRobIO() { std::memset(this, 0, sizeof(IssRobIO)); }
+	RobDisIO() { std::memset(this, 0, sizeof(RobDisIO)); }
 };
 
 struct IssExeIO {
@@ -148,4 +154,3 @@ struct RobBroadcastIO {
 
 	RobBroadcastIO() { std::memset(this, 0, sizeof(RobBroadcastIO)); }
 };
-

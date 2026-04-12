@@ -10,6 +10,7 @@ constexpr int RENAME_WIDTH = 4;
 constexpr int ISSUE_WIDTH = 4;
 constexpr int COMMIT_WIDTH = 4;
 constexpr int FE_BE_WIDTH = DECODE_WIDTH;
+constexpr int UOP_BUFFER_DEPTH = 16;
 
 constexpr int AREG_NUM = 32;
 constexpr int PRF_NUM = 128;
@@ -217,6 +218,10 @@ struct ExecUop {
 
 	wire<3> fu_class;
 	wire<1> replay;
+	wire<64> result_value;
+	wire<64> mem_addr;
+	wire<64> mem_wdata;
+	wire<8> mem_wmask;
 
 	ExecUop() { std::memset(this, 0, sizeof(ExecUop)); }
 };
@@ -268,4 +273,3 @@ struct BranchBroadcast {
 
 	BranchBroadcast() { std::memset(this, 0, sizeof(BranchBroadcast)); }
 };
-

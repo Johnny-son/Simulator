@@ -10,12 +10,29 @@ void Rob::init() {
 	rob_bcast_n_ = {};
 }
 
-bool Rob::is_empty() const {
-	return (enq_ptr_.idx == deq_ptr_.idx) && (enq_ptr_.epoch == deq_ptr_.epoch);
+bool Rob::is_empty(const RingPtr<ROB_SIZE> &enq, const RingPtr<ROB_SIZE> &deq) {
+	return (enq.idx == deq.idx) && (enq.epoch == deq.epoch);
 }
 
-bool Rob::is_full() const {
-	return (enq_ptr_.idx == deq_ptr_.idx) && (enq_ptr_.epoch != deq_ptr_.epoch);
+bool Rob::is_full(const RingPtr<ROB_SIZE> &enq, const RingPtr<ROB_SIZE> &deq) {
+	return (enq.idx == deq.idx) && (enq.epoch != deq.epoch);
+}
+
+uint32_t Rob::free_slots(const RingPtr<ROB_SIZE> &enq,
+				 const RingPtr<ROB_SIZE> &deq) {
+	const uint32_t enq_idx = static_cast<uint32_t>(enq.idx);
+	const uint32_t deq_idx = static_cast<uint32_t>(deq.idx);
+	const uint32_t enq_ext = enq_idx + (static_cast<uint32_t>(enq.epoch) * ROB_SIZE);
+	const uint32_t deq_ext = deq_idx + (static_cast<uint32_t>(deq.epoch) * ROB_SIZE);
+
+	int32_t used = static_cast<int32_t>(enq_ext) - static_cast<int32_t>(deq_ext);
+	if (used < 0) {
+		used += static_cast<int32_t>(2 * ROB_SIZE);
+	}
+	if (used > ROB_SIZE) {
+		used = ROB_SIZE;
+	}
+	return ROB_SIZE - static_cast<uint32_t>(used);
 }
 
 void Rob::advance_ptr(RingPtr<ROB_SIZE> &ptr) {
@@ -35,8 +52,41 @@ void Rob::comb_begin() {
 	if (out.rob_commit != nullptr) {
 		*(out.rob_commit) = {};
 	}
+	if (out.rob2dis != nullptr) {
+		*(out.rob2dis) = {};
+	}
 	if (out.rob_bcast != nullptr) {
 		*(out.rob_bcast) = {};
+	}
+}
+
+void Rob::comb_ready() {
+	if (out.rob2dis == nullptr) {
+		return;
+	}
+
+	const uint32_t slots = free_slots(enq_ptr_n_, deq_ptr_n_);
+	out.rob2dis->ready_num = (slots > 0xFFu) ? static_cast<wire<8>>(0xFFu)
+					   : static_cast<wire<8>>(slots);
+}
+
+void Rob::comb_alloc() {
+	if (in.dis2rob == nullptr) {
+		return;
+	}
+
+	for (int i = 0; i < RENAME_WIDTH; ++i) {
+		if (!in.dis2rob->valid[i] || is_full(enq_ptr_n_, deq_ptr_n_)) {
+			continue;
+		}
+
+		auto &slot = entry_n_[static_cast<uint32_t>(enq_ptr_n_.idx)];
+		slot.valid = 1;
+		slot.uop = in.dis2rob->req[i];
+		slot.uop.rob_idx = enq_ptr_n_.idx;
+		slot.uop.rob_epoch = enq_ptr_n_.epoch;
+		slot.uop.cplt_mask = 0;
+		advance_ptr(enq_ptr_n_);
 	}
 }
 
@@ -46,19 +96,32 @@ void Rob::comb_complete() {
 	}
 
 	for (int i = 0; i < ISSUE_WIDTH; ++i) {
-		if (!in.wb2rob->valid[i] || is_full()) {
+		if (!in.wb2rob->valid[i]) {
 			continue;
 		}
 
-		auto &slot = entry_n_[static_cast<uint32_t>(enq_ptr_n_.idx)];
-		slot.valid = 1;
-		slot.uop = in.wb2rob->wb[i];
-		advance_ptr(enq_ptr_n_);
+		const ExecUop &wb_uop = in.wb2rob->wb[i];
+		for (int j = 0; j < ROB_SIZE; ++j) {
+			auto &slot = entry_n_[j];
+			if (!slot.valid || slot.uop.front.seq_id != wb_uop.front.seq_id) {
+				continue;
+			}
+
+			slot.uop.cplt_mask |= wb_uop.cplt_mask;
+			if (wb_uop.front.except_valid) {
+				slot.uop.front.except_valid = 1;
+				slot.uop.front.except_code = wb_uop.front.except_code;
+			}
+			slot.uop.replay =
+				static_cast<bool>(slot.uop.replay) ||
+				static_cast<bool>(wb_uop.replay);
+			break;
+		}
 	}
 }
 
 void Rob::comb_commit() {
-	if (out.rob_commit == nullptr || is_empty()) {
+	if (out.rob_commit == nullptr || is_empty(enq_ptr_n_, deq_ptr_n_)) {
 		return;
 	}
 
@@ -79,9 +142,13 @@ void Rob::comb_commit() {
 	ce.pc = slot.uop.front.pc;
 	ce.dst_en = slot.uop.front.dst_en;
 	ce.dst_areg = slot.uop.front.dst_areg;
+	ce.dst_value = slot.uop.result_value;
 	ce.except_valid = slot.uop.front.except_valid;
 	ce.except_code = slot.uop.front.except_code;
 	ce.is_store = slot.uop.front.is_store;
+	ce.store_addr = slot.uop.mem_addr;
+	ce.store_data = slot.uop.mem_wdata;
+	ce.store_mask = slot.uop.mem_wmask;
 	ce.mispred = 0;
 	ce.flush_pipe = slot.uop.front.except_valid;
 	ce.dbg = slot.uop.front.dbg;
@@ -115,4 +182,3 @@ void Rob::seq() {
 	enq_ptr_ = enq_ptr_n_;
 	deq_ptr_ = deq_ptr_n_;
 }
-

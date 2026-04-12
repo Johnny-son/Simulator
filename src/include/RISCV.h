@@ -1,6 +1,36 @@
 #pragma once
 
 #include "Uop.h"
+#include <string>
+
+// Reused naming from the reference simulator (/simulator/include/RISCV.h),
+// so both projects can share opcode/encoding vocabulary.
+#define INST_EBREAK 0x00100073
+#define INST_ECALL 0x00000073
+#define INST_MRET 0x30200073
+#define INST_SRET 0x10200073
+#define INST_WFI 0x10500073
+#define INST_NOP 0x00000013
+
+enum enum_number_opcode {
+	number_0_opcode_lui = 0b0110111,
+	number_1_opcode_auipc = 0b0010111,
+	number_2_opcode_jal = 0b1101111,
+	number_3_opcode_jalr = 0b1100111,
+	number_4_opcode_beq = 0b1100011,
+	number_5_opcode_lb = 0b0000011,
+	number_6_opcode_sb = 0b0100011,
+	number_7_opcode_addi = 0b0010011,
+	number_8_opcode_add = 0b0110011,
+	number_9_opcode_fence = 0b0001111,
+	number_10_opcode_ecall = 0b1110011,
+	number_11_opcode_lrw = 0b0101111,
+	number_12_opcode_float = 0b1010011,
+	number_13_opcode_fmadd = 0b1000011,
+	number_14_opcode_fmsub = 0b1000111,
+	number_15_opcode_fnmsub = 0b1001011,
+	number_16_opcode_fnmadd = 0b1001111,
+};
 
 struct RiscvDecodedInst {
 	wire<1> valid;
@@ -96,4 +126,3 @@ inline RiscvDecodedInst decode_riscv_basic(uint32_t inst, uint64_t pc) {
 	out.illegal = 0;
 	return out;
 }
-

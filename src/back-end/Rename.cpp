@@ -4,12 +4,19 @@ void Rename::init() {
 	for (int i = 0; i < AREG_NUM; ++i) {
 		arch_rat_[i] = i;
 	}
+	buf2ren_ = {};
+	uop_buffer_.reset();
 }
 
 void Rename::comb_begin() {
+	buf2ren_ = {};
+	if (out.enq2dec != nullptr) {
+		*(out.enq2dec) = {};
+	}
 	if (out.ren2dis != nullptr) {
 		*(out.ren2dis) = {};
 	}
+	uop_buffer_.comb_begin();
 }
 
 void Rename::comb_alloc() {
@@ -23,7 +30,26 @@ void Rename::comb_alloc() {
 }
 
 void Rename::comb_rename() {
-	if (in.dec2ren == nullptr || out.ren2dis == nullptr || out.ren2dec == nullptr) {
+	if (out.ren2dec == nullptr || out.enq2dec == nullptr) {
+		return;
+	}
+
+	if (in.enq2buf != nullptr) {
+		uop_buffer_.in.enq2buf = *(in.enq2buf);
+	} else {
+		uop_buffer_.in.enq2buf = {};
+	}
+	uop_buffer_.in.ren2dec = *(out.ren2dec);
+	if (in.rob_bcast != nullptr) {
+		uop_buffer_.in.rob_bcast = *(in.rob_bcast);
+	} else {
+		uop_buffer_.in.rob_bcast = {};
+	}
+	uop_buffer_.comb();
+	*(out.enq2dec) = uop_buffer_.out.enq2dec;
+	buf2ren_ = uop_buffer_.out.buf2ren;
+
+	if (out.ren2dis == nullptr) {
 		return;
 	}
 
@@ -31,13 +57,13 @@ void Rename::comb_rename() {
 		out.ren2dis->valid[i] = 0;
 		out.ren2dis->uop[i] = {};
 
-		if (!out.ren2dec->ready || !in.dec2ren->valid[i]) {
+		if (!out.ren2dec->ready || !buf2ren_.valid[i]) {
 			continue;
 		}
 
 		ExecUop ex;
 		ex.valid = 1;
-		ex.front = in.dec2ren->uop[i];
+		ex.front = buf2ren_.uop[i];
 		ex.src_preg[0] = arch_rat_[static_cast<uint32_t>(ex.front.src_areg[0])];
 		ex.src_preg[1] = arch_rat_[static_cast<uint32_t>(ex.front.src_areg[1])];
 		ex.src_preg[2] = arch_rat_[static_cast<uint32_t>(ex.front.src_areg[2])];
@@ -55,5 +81,4 @@ void Rename::comb_rename() {
 	}
 }
 
-void Rename::seq() {}
-
+void Rename::seq() { uop_buffer_.seq(); }

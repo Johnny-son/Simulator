@@ -18,12 +18,20 @@ void WriteBack::comb_writeback() {
 		if (in.exe2wb->valid[i]) {
 			out.wb2rob->valid[i] = 1;
 			out.wb2rob->wb[i] = in.exe2wb->wb[i];
+			if (prf_ != nullptr && out.wb2rob->wb[i].front.dst_en) {
+				prf_->write(out.wb2rob->wb[i].dst_preg,
+							static_cast<uint64_t>(out.wb2rob->wb[i].result_value));
+			}
 			continue;
 		}
 
 		if (in.lsu2wb->valid[i]) {
 			out.wb2rob->valid[i] = 1;
 			out.wb2rob->wb[i] = in.lsu2wb->wb[i];
+			if (prf_ != nullptr && out.wb2rob->wb[i].front.dst_en) {
+				prf_->write(out.wb2rob->wb[i].dst_preg,
+							static_cast<uint64_t>(out.wb2rob->wb[i].result_value));
+			}
 		}
 	}
 }

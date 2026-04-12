@@ -5,10 +5,9 @@
 
 class Decode {
 public:
-	void comb(const FrontDecIO &front2dec, const RenDecIO &ren2dec,
+	void comb(const FrontDecIO &front2dec, const EnqDecIO &enq2dec,
 			  DecEnqIO &dec2enq, DecFrontIO &dec2front) const;
 
 private:
 	DecodeRiscv riscv_decoder_;
 };
-

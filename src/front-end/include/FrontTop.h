@@ -11,13 +11,14 @@ struct FrontTopIn {
 	wire<64> pc[FETCH_WIDTH];
 	wire<1> valid[FETCH_WIDTH];
 	wire<1> predict_dir[FETCH_WIDTH];
+	wire<1> limit_en;
+	wire<64> limit_pc;
 
 	FrontTopIn() { std::memset(this, 0, sizeof(FrontTopIn)); }
 };
 
 struct FrontTopOut {
-	DecRenIO dec2ren;
-	DecFrontIO dec2front;
+	EnqRenIO enq2buf;
 
 	FrontTopOut() { std::memset(this, 0, sizeof(FrontTopOut)); }
 };
@@ -26,9 +27,10 @@ class FrontTop {
 public:
 	FrontTopIn in;
 	FrontTopOut out;
-	RenDecIO ren2dec;
+	EnqDecIO enq2dec;
 	RobBroadcastIO rob_bcast;
 
+	void bind_icache(memsys::ICacheSimple *icache) { ifetch_.bind_icache(icache); }
 	void comb_begin();
 	void comb();
 	void seq();
@@ -41,8 +43,8 @@ private:
 	FrontEnqueue front_enqueue_;
 
 	PIFetchIFetchIO pifetch_to_ifetch_;
+	DecFrontIO dec2front_;
 	FrontDecIO ifetch_to_predecode_;
 	FrontDecIO predecode_to_decode_;
 	DecEnqIO decode_to_enq_;
 };
-

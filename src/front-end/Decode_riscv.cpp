@@ -21,6 +21,9 @@ FrontUop DecodeRiscv::decode_lane(wire<32> inst, wire<64> pc,
 	uop.dbg.raw_inst = inst;
 	uop.dbg.pc = pc;
 	uop.pc = pc;
+	uop.seq_id = pc >> 2;
+	uop.uop_id = uop.seq_id;
+	uop.dbg.inst_seq = uop.seq_id;
 	uop.pred_taken = pred_taken;
 
 	const RiscvDecodedInst dec = decode_riscv_basic(inst, pc);
@@ -177,6 +180,7 @@ FrontUop DecodeRiscv::decode_lane(wire<32> inst, wire<64> pc,
 		uop.src_areg[0] = dec.rs1;
 		uop.dst_en = (dec.rd != 0);
 		uop.dst_areg = dec.rd;
+		uop.imm = (static_cast<uint32_t>(inst) >> 20) & 0xFFFu;
 		switch (dec.funct3) {
 		case 0x0:
 			if ((inst >> 20) == 0) {
@@ -191,9 +195,18 @@ FrontUop DecodeRiscv::decode_lane(wire<32> inst, wire<64> pc,
 		case 0x1: uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRW); break;
 		case 0x2: uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRS); break;
 		case 0x3: uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRC); break;
-		case 0x5: uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRWI); break;
-		case 0x6: uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRSI); break;
-		case 0x7: uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRCI); break;
+		case 0x5:
+			uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRWI);
+			uop.src_en[0] = 0;
+			break;
+		case 0x6:
+			uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRSI);
+			uop.src_en[0] = 0;
+			break;
+		case 0x7:
+			uop.sub_op = static_cast<uint16_t>(RiscvSubOp::CSRRCI);
+			uop.src_en[0] = 0;
+			break;
 		default: uop.except_valid = 1; uop.except_code = 2; break;
 		}
 		break;
@@ -205,4 +218,3 @@ FrontUop DecodeRiscv::decode_lane(wire<32> inst, wire<64> pc,
 
 	return uop;
 }
-
